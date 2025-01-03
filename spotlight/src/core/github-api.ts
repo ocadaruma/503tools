@@ -1,5 +1,5 @@
 import { Octokit } from '@octokit/rest'
-import type { Result } from '@/core/result.ts'
+import type { Ok, Result } from '@/core/result.ts'
 import { toBase64 } from '@/core/image.ts'
 
 export class GithubApi {
@@ -19,7 +19,7 @@ export class GithubApi {
 
   checkAccess(): Promise<Result<void>> {
     return this.octokit.rest.repos.get({ owner: this.owner, repo: this.repo })
-      .then(() => ({ key: "ok", value: null }))
+      .then<Ok<void>>(() => ({ key: "ok", value: undefined }))
       .catch((e) => ({ key: "err", error: e }))
   }
 
@@ -32,7 +32,7 @@ export class GithubApi {
       path,
       message,
       content: base64
-    })
+    }).then(() => {})
   }
 
   async commitImage(message: string, path: string, image: Blob): Promise<void> {
@@ -43,6 +43,6 @@ export class GithubApi {
       path,
       message,
       content: base64
-    })
+    }).then(() => {})
   }
 }

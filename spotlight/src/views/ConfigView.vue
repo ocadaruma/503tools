@@ -19,14 +19,14 @@ const githubConfig = reactive<GitHubConfig>({
   repo: "",
   root: "/"
 })
-const githubTestResult = ref<null | { key: "success" } | { key: "loading" } | { key: "error", error: Error }>(null)
+const githubTestResult = ref<{ key: "success" } | { key: "loading" } | { key: "error", error: Error }>()
 const { checkSession, loginWithRedirect, logout, isAuthenticated, user, getAccessTokenSilently } = useAuth0()
 
 const auth0Config = Auth0ConfigStore.load()!
 
 async function getCredentialsStore() {
   const token = await getAccessTokenSilently()
-  return new CredentialsStore(auth0Config.domain, token, user.value)
+  return new CredentialsStore(auth0Config.domain, token, user.value!)
 }
 
 onMounted(async () => {
@@ -34,8 +34,8 @@ onMounted(async () => {
   if (isAuthenticated.value) {
     const store = await getCredentialsStore()
     const credentials = await store.load()
-    githubToken.value = credentials?.githubToken
-    geminiApiKey.value = credentials?.geminiApiKey
+    githubToken.value = credentials?.githubToken || ""
+    geminiApiKey.value = credentials?.geminiApiKey || ""
   }
   const loadedGithubConfig = GitHubConfigStore.load()
   if (loadedGithubConfig) {
@@ -52,7 +52,7 @@ function resetAuth0() {
 
 async function saveCredentials() {
   const token = await getAccessTokenSilently()
-  const store = new CredentialsStore(auth0Config.domain, token, user.value)
+  const store = new CredentialsStore(auth0Config.domain, token, user.value!)
   await store.save({
     githubToken: githubToken.value,
     geminiApiKey: geminiApiKey.value

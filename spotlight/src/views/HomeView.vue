@@ -23,12 +23,12 @@ const path = ref("/")
 const title = ref("")
 const summary = ref("")
 const content = ref("")
-const image = ref<File>(null)
+const image = ref<File>()
 const imageUrl = computed(() => {
-  return image.value ? URL.createObjectURL(image.value) : null
+  return image.value ? URL.createObjectURL(image.value) : undefined
 })
-const githubCommitResult = ref<null | { key: "success" } | { key: "loading" } | { key: "error", error: Error }>(null)
-const geminiApiResult = ref<null | { key: "success" } | { key: "loading" } | { key: "error", error: Error }>(null)
+const githubCommitResult = ref<{ key: "success" } | { key: "loading" } | { key: "error", error: any }>()
+const geminiApiResult = ref<{ key: "success" } | { key: "loading" } | { key: "error", error: any }>()
 const { checkSession, isAuthenticated, user, getAccessTokenSilently } = useAuth0()
 const auth0Config = Auth0ConfigStore.load()!
 const githubConfig = GitHubConfigStore.load()
@@ -37,20 +37,20 @@ onMounted(async () => {
   await checkSession()
   if (isAuthenticated.value) {
     const token = await getAccessTokenSilently()
-    const store = new CredentialsStore(auth0Config.domain, token, user.value)
+    const store = new CredentialsStore(auth0Config.domain, token, user.value!)
     const credentials = await store.load()
-    githubToken.value = credentials?.githubToken
-    geminiApiKey.value = credentials?.geminiApiKey
+    githubToken.value = credentials?.githubToken || ""
+    geminiApiKey.value = credentials?.geminiApiKey || ""
   }
 })
 
-function uploadImage(e) {
-  image.value = e.target.files[0]
+function uploadImage(e: Event) {
+  image.value = (e.target as HTMLInputElement).files![0]
 }
 
 async function autoFill() {
   // apply max size to prevent consuming unnecessarily many tokens
-  const resized = await resizeAsJpeg(image.value, 1920, 2560)
+  const resized = await resizeAsJpeg(image.value!, 1920, 2560)
   const imagePart = {
     inlineData: {
       data: await toBase64(resized),
@@ -106,7 +106,7 @@ async function autoFill() {
 async function commit() {
   const nowMillis = Date.now()
   const nowDate = new Date(nowMillis)
-  const filenameBase = `${format(nowDate, "yyyy-MM-dd-HHmmSS")}_${sanitizeFilename(title.value)}`
+  const filenameBase = `${format(nowDate, "yyyy-MM-dd-HHmmSS")}_${sanitizeFilename(title.value, "_")}`
   const gitPathBase = join(githubConfig!.root, path.value)
 
   const docPath = join(gitPathBase, `${filenameBase}.adoc`)
@@ -121,27 +121,27 @@ async function commit() {
   doc += "\n"
 
   if (image.value) {
-    doc += `image::./images/${filenameBase}.jpg\n`
+    doc += `image::./images/${filenameBase}.jpg[]\n`
     doc += "\n"
   }
 
   doc += "[%hardbreaks]\n"
   doc += summary.value
-  doc += "\n"
+  doc += "\n\n"
 
   doc += "== Content\n"
   doc += "[%hardbreaks]\n"
   doc += content.value
   doc += "\n"
 
-  const github = new GithubApi(githubToken.value, githubConfig?.owner, githubConfig?.repo)
+  const github = new GithubApi(githubToken.value, githubConfig!.owner, githubConfig!.repo)
   githubCommitResult.value = { "key": "loading" }
   try {
     if (image.value) {
       // Resize because the requirement for this image is to tell how the doc looks to help users
       // to find the actual (physical) doc, rather than to store fully parseable image
       const resized = await resizeAsJpeg(image.value, 300, 400)
-      await github.commitImage(`Add image for ${filenameBase}`, imagePath, await toBase64(resized))
+      await github.commitImage(`Add image for ${filenameBase}`, imagePath, resized)
     }
     await github.commitText(`Add doc for ${filenameBase}`, docPath, doc)
     githubCommitResult.value = { "key": "success" }
@@ -156,7 +156,7 @@ async function commit() {
     <Form>
       <Section title="Document:">
         <Row>
-          <Button @click="autoFill" :disabled="!image || !geminiApiKey">
+          <Button @click="autoFill" :disabled="!image || !geminiApiKey || geminiApiResult?.key === 'loading'">
             <span v-if="geminiApiKey">Auto Fill from Image</span>
             <span v-else>You must setup Gemini API Key first in Config view</span>
           </Button>
@@ -194,7 +194,7 @@ async function commit() {
                      class="w-full md:w-4/5 lg:w-3/5"/>
         </Row>
         <Row>
-          <Button @click="commit" :disabled="!githubToken || !githubConfig || !title">
+          <Button @click="commit" :disabled="!githubToken || !githubConfig || !title || githubCommitResult?.key === 'loading'">
             <span v-if="githubToken && githubConfig">Commit</span>
             <span v-else>You must setup GitHub token and owner/repo first in Config view</span>
           </Button>

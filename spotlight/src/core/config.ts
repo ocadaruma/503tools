@@ -71,7 +71,7 @@ export class CredentialsStore {
           gemini_api_key: credentials.geminiApiKey,
         }
       })
-    })
+    }).then(() => {})
   }
 }
 

@@ -5,7 +5,7 @@ export interface Ok<T> {
 
 export interface Err {
   key: "err"
-  error: Error
+  error: any
 }
 
 export type Result<T> = Ok<T> | Err

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 defineProps(["placeholder", "name"])
 
-const model = defineModel()
+const model = defineModel<string>()
 </script>
 
 <template>

@@ -2,7 +2,7 @@ export async function toBase64(data: Blob): Promise<string> {
   const reader = new FileReader()
   const readPromise = new Promise<string>((resolve) => {
     reader.onloadend = () => {
-      resolve(reader.result.split(",")[1])
+      resolve((reader.result as string).split(",")[1])
     }
   })
   reader.readAsDataURL(data)
@@ -10,7 +10,7 @@ export async function toBase64(data: Blob): Promise<string> {
 }
 
 export async function resizeAsJpeg(data: Blob, maxWidth: number, maxHeight: number): Promise<Blob> {
-  const ctx = document.createElement("canvas").getContext("2d")
+  const ctx = document.createElement("canvas").getContext("2d")!
   const img: HTMLImageElement = await new Promise((resolve, reject) => {
     const i = new Image()
     i.addEventListener("load", () => resolve(i))
@@ -29,5 +29,7 @@ export async function resizeAsJpeg(data: Blob, maxWidth: number, maxHeight: numb
   ctx.canvas.height = resizedH
   ctx.drawImage(img, 0, 0, naturalWidth, naturalHeight, 0, 0, resizedW, resizedH)
 
-  return await new Promise((resolve) => ctx.canvas.toBlob(resolve, "image/jpeg", 0.9))
+  return await new Promise((resolve) => ctx.canvas.toBlob((blob) => {
+    resolve(blob!)
+  }, "image/jpeg", 0.9))
 }

@@ -1,7 +1,7 @@
 <script setup lang="ts">
-withDefaults(defineProps<{
-  status: null | { key: "success" } | { key: "loading" } | { key: "error", error: Error }
-}>(), null)
+defineProps<{
+  status?: { key: "success" } | { key: "loading" } | { key: "error", error: any }
+}>()
 </script>
 
 <template>
