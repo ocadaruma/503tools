@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { format } from 'date-fns'
-import { useAuth0 } from '@auth0/auth0-vue'
 import Section from '@/components/Section.vue'
 import Container from '@/components/Container.vue'
 import Form from '@/components/Form.vue'
@@ -10,15 +9,13 @@ import TextArea from '@/components/TextArea.vue'
 import FormLabel from '@/components/FormLabel.vue'
 import Row from '@/components/Row.vue'
 import Button from '@/components/Button.vue'
-import { Auth0ConfigStore, CredentialsStore, GitHubConfigStore } from '@/core/config.ts'
+import { type Config, ConfigStore } from '@/core/config.ts'
 import Preloader from '@/components/Preloader.vue'
 import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai'
 import { resizeAsJpeg, toBase64 } from '@/core/image.ts'
 import { join, sanitizeFilename } from '@/core/path.ts'
 import { GithubApi } from '@/core/github-api.ts'
 
-const geminiApiKey = ref("")
-const githubToken = ref("")
 const path = ref("/")
 const title = ref("")
 const summary = ref("")
@@ -29,18 +26,12 @@ const imageUrl = computed(() => {
 })
 const githubCommitResult = ref<{ key: "success" } | { key: "loading" } | { key: "error", error: any }>()
 const geminiApiResult = ref<{ key: "success" } | { key: "loading" } | { key: "error", error: any }>()
-const { checkSession, isAuthenticated, user, getAccessTokenSilently } = useAuth0()
-const auth0Config = Auth0ConfigStore.load()!
-const githubConfig = GitHubConfigStore.load()
+const config = ref<Config>()
 
 onMounted(async () => {
-  await checkSession()
-  if (isAuthenticated.value) {
-    const token = await getAccessTokenSilently()
-    const store = new CredentialsStore(auth0Config.domain, token, user.value!)
-    const credentials = await store.load()
-    githubToken.value = credentials?.githubToken || ""
-    geminiApiKey.value = credentials?.geminiApiKey || ""
+  const c = ConfigStore.load()
+  if (c) {
+    config.value = c
   }
 })
 
@@ -58,7 +49,7 @@ async function autoFill() {
     }
   }
   const prompt = "Analyze this document by detecting the language, and output the result."
-  const genAI = new GoogleGenerativeAI(geminiApiKey.value)
+  const genAI = new GoogleGenerativeAI(config.value!.geminiApiKey)
   const model = genAI.getGenerativeModel({
     model: "gemini-1.5-flash",
     generationConfig: {
@@ -107,7 +98,7 @@ async function commit() {
   const nowMillis = Date.now()
   const nowDate = new Date(nowMillis)
   const filenameBase = `${format(nowDate, "yyyy-MM-dd-HHmmSS")}_${sanitizeFilename(title.value, "_")}`
-  const gitPathBase = join(githubConfig!.root, path.value)
+  const gitPathBase = join(config.value!.githubDataRoot, path.value)
 
   const docPath = join(gitPathBase, `${filenameBase}.adoc`)
   const imagePath = join(gitPathBase, `images/${filenameBase}.jpg`)
@@ -134,7 +125,7 @@ async function commit() {
   doc += content.value
   doc += "\n"
 
-  const github = new GithubApi(githubToken.value, githubConfig!.owner, githubConfig!.repo)
+  const github = new GithubApi(config.value!.githubToken, config.value!.githubOwner, config.value!.githubRepo)
   githubCommitResult.value = { "key": "loading" }
   try {
     if (image.value) {
@@ -156,8 +147,8 @@ async function commit() {
     <Form>
       <Section title="Document:">
         <Row>
-          <Button @click="autoFill" :disabled="!image || !geminiApiKey || geminiApiResult?.key === 'loading'">
-            <span v-if="geminiApiKey">Auto Fill from Image</span>
+          <Button @click="autoFill" :disabled="!image || !config || geminiApiResult?.key === 'loading'">
+            <span v-if="config">Auto Fill from Image</span>
             <span v-else>You must setup Gemini API Key first in Config view</span>
           </Button>
           <Preloader :status="geminiApiResult"/>
@@ -194,8 +185,8 @@ async function commit() {
                      class="w-full md:w-4/5 lg:w-3/5"/>
         </Row>
         <Row>
-          <Button @click="commit" :disabled="!githubToken || !githubConfig || !title || githubCommitResult?.key === 'loading'">
-            <span v-if="githubToken && githubConfig">Commit</span>
+          <Button @click="commit" :disabled="!config || !title || githubCommitResult?.key === 'loading'">
+            <span v-if="config">Commit</span>
             <span v-else>You must setup GitHub token and owner/repo first in Config view</span>
           </Button>
           <Preloader :status="githubCommitResult"/>
